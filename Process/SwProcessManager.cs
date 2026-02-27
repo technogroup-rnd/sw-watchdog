@@ -338,6 +338,38 @@ internal sealed class SwProcessManager : IDisposable
     private void Launch(CancellationToken ct)
     {
         var exePath = ResolveSolidWorksPath();
+
+        // Kill any orphan SLDWORKS processes before starting a new one.
+        // Scenario: service restarted (_swProcess=null) but old SW still alive, or Kill() threw.
+        var orphans = System.Diagnostics.Process.GetProcessesByName("SLDWORKS");
+        if (orphans.Length > 0)
+        {
+            _logger.LogWarning(
+                "Found {Count} orphan SLDWORKS process(es) — killing before launch",
+                orphans.Length
+            );
+            foreach (var orphan in orphans)
+            {
+                try
+                {
+                    orphan.Kill(entireProcessTree: true);
+                    orphan.WaitForExit(TimeSpan.FromSeconds(5));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "Failed to kill orphan SLDWORKS (PID={Pid})",
+                        orphan.Id
+                    );
+                }
+                finally
+                {
+                    orphan.Dispose();
+                }
+            }
+        }
+
         _logger.LogInformation("Stage 1: Launching SolidWorks from {Path}", exePath);
 
         // --- Stage 1: Process.Start ---
