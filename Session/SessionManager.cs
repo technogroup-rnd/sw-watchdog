@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SolidWorks.Interop.sldworks;
@@ -20,7 +21,6 @@ internal sealed class SessionManager : IDisposable
     private readonly Lock _lock = new();
 
     private string? _activeSessionId;
-    private CancellationTokenSource? _sessionWatchdogCts;
     private bool _disposed;
 
     public SessionManager(
@@ -131,10 +131,6 @@ internal sealed class SessionManager : IDisposable
                 _activeSessionId = sessionId;
             }
 
-            // Start session watchdog timer
-            _sessionWatchdogCts = new CancellationTokenSource();
-            _ = RunSessionWatchdogAsync(sessionId, _sessionWatchdogCts.Token);
-
             _logger.LogInformation(
                 "Session {SessionId} acquired, workingDir={Dir}",
                 sessionId,
@@ -157,10 +153,6 @@ internal sealed class SessionManager : IDisposable
     {
         try
         {
-            _sessionWatchdogCts?.Cancel();
-            _sessionWatchdogCts?.Dispose();
-            _sessionWatchdogCts = null;
-
             // Run cleanup isolation on STA thread
             if (_processManager.IsRunning)
             {
@@ -189,35 +181,12 @@ internal sealed class SessionManager : IDisposable
         }
     }
 
-    private async Task RunSessionWatchdogAsync(string sessionId, CancellationToken ct)
-    {
-        try
-        {
-            await Task.Delay(_options.SessionWatchdogTimeout, ct);
-
-            _logger.LogError(
-                "Session {SessionId} exceeded watchdog timeout ({Timeout}), forcing release",
-                sessionId,
-                _options.SessionWatchdogTimeout
-            );
-
-            _processManager.MarkDegraded();
-            await ReleaseAsync(sessionId);
-        }
-        catch (OperationCanceledException)
-        {
-            // Normal — session was released before timeout
-        }
-    }
-
     public void Dispose()
     {
         if (_disposed)
             return;
         _disposed = true;
 
-        _sessionWatchdogCts?.Cancel();
-        _sessionWatchdogCts?.Dispose();
         _semaphore.Dispose();
     }
 }
@@ -251,39 +220,71 @@ internal sealed class SwSession : ISwSession
     public string SessionId { get; }
     public string WorkingDirectory { get; }
 
-    public Task<TResult> ExecuteAsync<TResult>(
+    public async Task<TResult> ExecuteAsync<TResult>(
         Func<ISldWorks, TResult> operation,
         CancellationToken ct
     )
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
 
-        return _staThread.EnqueueAsync(
-            () =>
-            {
-                var swApp =
-                    _processManager.SwApp
-                    ?? throw new InvalidOperationException("SolidWorks is not running");
-                return operation(swApp);
-            },
-            ct
-        );
+        try
+        {
+            return await _staThread.EnqueueAsync(
+                () =>
+                {
+                    var swApp =
+                        _processManager.SwApp
+                        ?? throw new InvalidOperationException("SolidWorks is not running");
+                    return operation(swApp);
+                },
+                ct
+            );
+        }
+        catch (Exception ex)
+            when (IsProcessKilledException(
+                    ex,
+                    _processManager.IsDegraded,
+                    _processManager.IsRunning
+                )
+            )
+        {
+            throw new SwProcessKilledException(
+                "SolidWorks was killed by hang detection during active session",
+                ex
+            );
+        }
     }
 
-    public Task ExecuteAsync(Action<ISldWorks> operation, CancellationToken ct)
+    public async Task ExecuteAsync(Action<ISldWorks> operation, CancellationToken ct)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
 
-        return _staThread.EnqueueAsync(
-            () =>
-            {
-                var swApp =
-                    _processManager.SwApp
-                    ?? throw new InvalidOperationException("SolidWorks is not running");
-                operation(swApp);
-            },
-            ct
-        );
+        try
+        {
+            await _staThread.EnqueueAsync(
+                () =>
+                {
+                    var swApp =
+                        _processManager.SwApp
+                        ?? throw new InvalidOperationException("SolidWorks is not running");
+                    operation(swApp);
+                },
+                ct
+            );
+        }
+        catch (Exception ex)
+            when (IsProcessKilledException(
+                    ex,
+                    _processManager.IsDegraded,
+                    _processManager.IsRunning
+                )
+            )
+        {
+            throw new SwProcessKilledException(
+                "SolidWorks was killed by hang detection during active session",
+                ex
+            );
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -293,4 +294,12 @@ internal sealed class SwSession : ISwSession
 
         await _sessionManager.ReleaseAsync(SessionId);
     }
+
+    /// <summary>
+    /// Determines if a COM exception should be wrapped as <see cref="SwProcessKilledException"/>.
+    /// True when: exception is COMException/SEHException AND process was killed by hang detection
+    /// (degraded + not running). Testable static method — called from exception filter.
+    /// </summary>
+    internal static bool IsProcessKilledException(Exception ex, bool isDegraded, bool isRunning) =>
+        ex is COMException or SEHException && isDegraded && !isRunning;
 }

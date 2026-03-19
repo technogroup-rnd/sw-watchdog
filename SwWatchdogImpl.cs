@@ -105,8 +105,12 @@ internal sealed class SwWatchdogImpl : ISwWatchdog
             .ContinueWith(t => (ISwSession)t.Result, TaskContinuationOptions.OnlyOnRanToCompletion);
     }
 
+    public ResourcePressure GetResourcePressure() => _processManager.GetResourcePressure();
+
     public SwWatchdogStatus GetStatus()
     {
+        var snapshot = _processManager.SampleResources();
+
         return new SwWatchdogStatus
         {
             SwRunning = _processManager.IsRunning,
@@ -116,6 +120,11 @@ internal sealed class SwWatchdogImpl : ISwWatchdog
             ActiveSessionId = _sessionManager.ActiveSessionId,
             MemoryMb = _processManager.MemoryMb,
             Degraded = _processManager.IsDegraded,
+            GdiObjects = snapshot?.GdiObjects ?? 0,
+            UserObjects = snapshot?.UserObjects ?? 0,
+            GdiPeak = snapshot?.GdiPeak ?? 0,
+            FreeSystemMemoryMb = snapshot?.FreeSystemMemoryMb ?? 0,
+            ResourcePressure = snapshot?.Overall ?? ResourcePressure.Low,
         };
     }
 
@@ -157,19 +166,74 @@ internal sealed class SwWatchdogImpl : ISwWatchdog
 
                 if (!_processManager.CheckResponsive())
                 {
-                    _logger.LogError(
-                        "SolidWorks hang detected (PID={Pid}), killing and restarting",
-                        _processManager.SwPid
-                    );
+                    // Unresponsive — confirm with exponential backoff + CPU activity check.
+                    // SW doesn't pump messages during heavy COM operations (large assembly load),
+                    // so WM_NULL timeout alone causes false positives.
+                    // CPU delta distinguishes busy (CPU growing) from hung (CPU stalled).
+                    var retries = Math.Max(1, _options.HangConfirmRetries);
+                    var cpuBefore = _processManager.GetCpuTime();
+                    var confirmed = true;
 
-                    _processManager.MarkDegraded();
-
-                    if (_sessionManager.ActiveSessionId is null)
+                    for (var attempt = 1; attempt < retries; attempt++)
                     {
-                        await _staThread.EnqueueAsync(
-                            () => _processManager.Restart(CancellationToken.None),
-                            CancellationToken.None
+                        var backoff = TimeSpan.FromTicks(
+                            _options.HangCheckInterval.Ticks * (1L << attempt)
                         );
+
+                        await Task.Delay(backoff, ct);
+
+                        if (_processManager.CheckResponsive())
+                        {
+                            _logger.LogInformation(
+                                "SolidWorks recovered after {Attempt} retries (PID={Pid})",
+                                attempt,
+                                _processManager.SwPid
+                            );
+                            confirmed = false;
+                            break;
+                        }
+
+                        // Check CPU activity — if CPU is growing, SW is busy, not hung
+                        var cpuAfter = _processManager.GetCpuTime();
+                        var cpuDelta = cpuAfter - cpuBefore;
+
+                        if (cpuDelta > TimeSpan.FromMilliseconds(100))
+                        {
+                            _logger.LogInformation(
+                                "SolidWorks unresponsive but CPU active (PID={Pid}, cpuDelta={CpuDelta}ms, attempt={Attempt}/{Retries}) — busy, not hung",
+                                _processManager.SwPid,
+                                cpuDelta.TotalMilliseconds,
+                                attempt,
+                                retries
+                            );
+                            confirmed = false;
+                            break;
+                        }
+
+                        _logger.LogWarning(
+                            "SolidWorks unresponsive, CPU idle (PID={Pid}, cpuDelta={CpuDelta}ms, attempt={Attempt}/{Retries})",
+                            _processManager.SwPid,
+                            cpuDelta.TotalMilliseconds,
+                            attempt,
+                            retries
+                        );
+                        cpuBefore = cpuAfter;
+                    }
+
+                    if (confirmed)
+                    {
+                        _logger.LogError(
+                            "SolidWorks hang confirmed — unresponsive and CPU idle after {Retries} checks (PID={Pid}), killing",
+                            retries,
+                            _processManager.SwPid
+                        );
+
+                        // Kill — process is truly hung, nothing to save.
+                        // If a session is active, the blocked COM call will throw COMException
+                        // which SwSession wraps into SwProcessKilledException for the caller.
+                        // Next AcquireSessionAsync will restart SW via EnsureRunning.
+                        _processManager.MarkDegraded();
+                        _processManager.Kill();
                     }
                 }
                 else if (_processManager.CheckModalDialog())
@@ -208,20 +272,13 @@ internal sealed class SwWatchdogImpl : ISwWatchdog
                         );
                     }
 
-                    // D7 Layer 7: Kill + restart as last resort
+                    // D7 Layer 7: Kill as last resort
                     _logger.LogError(
                         "Modal dialog could not be auto-dismissed (PID={Pid}) — killing",
                         _processManager.SwPid
                     );
                     _processManager.MarkDegraded();
-
-                    if (_sessionManager.ActiveSessionId is null)
-                    {
-                        await _staThread.EnqueueAsync(
-                            () => _processManager.Restart(CancellationToken.None),
-                            CancellationToken.None
-                        );
-                    }
+                    _processManager.Kill();
                 }
             }
             catch (OperationCanceledException)

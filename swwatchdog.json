@@ -2,10 +2,10 @@
   "StartupTimeout": "00:02:00",
   "HangCheckInterval": "00:00:05",
   "HangCheckTimeout": "00:00:05",
-  "RestartAfterFileCount": 500,
-  "RestartAfterElapsed": "04:00:00",
-  "RestartAfterMemoryMb": 4096,
+  "HangConfirmRetries": 3,
+  "FreeMemoryLimitMb": 512,
+  "GdiObjectsLimitPercent": 80,
+  "UserObjectsLimitPercent": 80,
   "IdleShutdownAfter": "00:30:00",
-  "SessionWatchdogTimeout": "00:30:00",
   "RotPollingInterval": "00:00:00.500"
 }

@@ -17,13 +17,13 @@ internal sealed class SwProcessManager : IDisposable
 {
     private readonly SwWatchdogOptions _options;
     private readonly ILogger _logger;
+    private readonly ResourceMonitor _resourceMonitor;
     private readonly Lock _lock = new();
 
     private System.Diagnostics.Process? _swProcess;
     private ISldWorks? _swApp;
     private nint _swHwnd;
     private DateTime _startTime;
-    private int _filesProcessed;
     private bool _degraded;
     private bool _disposed;
 
@@ -36,6 +36,7 @@ internal sealed class SwProcessManager : IDisposable
     {
         _options = options.Value;
         _logger = logger;
+        _resourceMonitor = new ResourceMonitor(_options, logger);
     }
 
     public ISldWorks? SwApp
@@ -117,6 +118,28 @@ internal sealed class SwProcessManager : IDisposable
         }
     }
 
+    /// <summary>
+    /// Read total CPU time for the SW process. Safe from any thread.
+    /// Returns <see cref="TimeSpan.Zero"/> if process is not running or on error.
+    /// </summary>
+    public TimeSpan GetCpuTime()
+    {
+        lock (_lock)
+        {
+            if (_swProcess is not { HasExited: false })
+                return TimeSpan.Zero;
+            try
+            {
+                _swProcess.Refresh();
+                return _swProcess.TotalProcessorTime;
+            }
+            catch
+            {
+                return TimeSpan.Zero;
+            }
+        }
+    }
+
     public void MarkDegraded()
     {
         lock (_lock)
@@ -126,11 +149,44 @@ internal sealed class SwProcessManager : IDisposable
         _logger.LogWarning("SolidWorks process marked as degraded");
     }
 
-    public void IncrementFileCount(int count = 1)
+    /// <summary>
+    /// Current resource pressure (worst of GDI, USER, memory).
+    /// Safe from any thread — Win32 only, no COM/STA.
+    /// PID is read under lock, then Win32 calls are made outside the lock
+    /// to avoid blocking other threads during potentially slow syscalls.
+    /// </summary>
+    public ResourcePressure GetResourcePressure()
     {
+        int pid;
         lock (_lock)
         {
-            _filesProcessed += count;
+            if (_swProcess is not { HasExited: false })
+                return ResourcePressure.Low;
+            pid = _swProcess.Id;
+        }
+        return _resourceMonitor.GetPressure(pid);
+    }
+
+    /// <summary>
+    /// Full resource snapshot for status reporting. Returns null if SW is not running or on error.
+    /// </summary>
+    public ResourceSnapshot? SampleResources()
+    {
+        int pid;
+        lock (_lock)
+        {
+            if (_swProcess is not { HasExited: false })
+                return null;
+            pid = _swProcess.Id;
+        }
+        try
+        {
+            return _resourceMonitor.Sample(pid);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Failed to sample resources for status");
+            return null;
         }
     }
 
@@ -150,24 +206,18 @@ internal sealed class SwProcessManager : IDisposable
     /// </summary>
     public bool NeedsRestart()
     {
+        bool degraded;
+        int pid;
+
         lock (_lock)
         {
-            if (_degraded)
-                return true;
-            if (
-                _options.RestartAfterFileCount > 0
-                && _filesProcessed >= _options.RestartAfterFileCount
-            )
-                return true;
-            if (
-                _options.RestartAfterElapsed > TimeSpan.Zero
-                && Uptime >= _options.RestartAfterElapsed
-            )
-                return true;
-            if (_options.RestartAfterMemoryMb > 0 && MemoryMb >= _options.RestartAfterMemoryMb)
-                return true;
-            return false;
+            degraded = _degraded;
+            pid = _swProcess is { HasExited: false } ? _swProcess.Id : 0;
         }
+
+        if (degraded)
+            return true;
+        return pid != 0 && _resourceMonitor.GetPressure(pid) >= ResourcePressure.High;
     }
 
     /// <summary>
@@ -176,11 +226,11 @@ internal sealed class SwProcessManager : IDisposable
     public void Restart(CancellationToken ct)
     {
         _logger.LogInformation(
-            "Restarting SolidWorks (degraded={Degraded}, files={Files}, uptime={Uptime}, memMb={Mem})",
+            "Restarting SolidWorks (degraded={Degraded}, uptime={Uptime}, memMb={Mem}, pressure={Pressure})",
             _degraded,
-            _filesProcessed,
             Uptime,
-            MemoryMb
+            MemoryMb,
+            GetResourcePressure()
         );
 
         Kill();
@@ -336,7 +386,6 @@ internal sealed class SwProcessManager : IDisposable
             }
 
             _degraded = false;
-            _filesProcessed = 0;
         }
     }
 
@@ -393,7 +442,6 @@ internal sealed class SwProcessManager : IDisposable
             _swProcess = process;
             _startTime = DateTime.UtcNow;
             _degraded = false;
-            _filesProcessed = 0;
 
             // Crash detection via event (instant, not polling)
             process.EnableRaisingEvents = true;

@@ -49,6 +49,35 @@ internal static partial class NativeMethods
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern int GetClassNameW(nint hWnd, StringBuilder lpClassName, int nMaxCount);
 
+    // --- GetGuiResources (GDI/USER object monitoring) ---
+
+    public const uint GR_GDIOBJECTS = 0;
+    public const uint GR_USEROBJECTS = 1;
+    public const uint GR_GDIOBJECTS_PEAK = 2; // Windows 7+
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    public static partial uint GetGuiResources(nint hProcess, uint uiFlags);
+
+    // --- GlobalMemoryStatusEx (system free memory) ---
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MEMORYSTATUSEX
+    {
+        public uint dwLength;
+        public uint dwMemoryLoad;
+        public ulong ullTotalPhys;
+        public ulong ullAvailPhys;
+        public ulong ullTotalPageFile;
+        public ulong ullAvailPageFile;
+        public ulong ullTotalVirtual;
+        public ulong ullAvailVirtual;
+        public ulong ullAvailExtendedVirtual;
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX lpBuffer);
+
     // COM interface types not supported by LibraryImport source generator — use DllImport
     [DllImport("ole32.dll")]
     public static extern int GetRunningObjectTable(uint reserved, out IRunningObjectTable pprot);

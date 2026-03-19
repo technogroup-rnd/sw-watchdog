@@ -35,4 +35,12 @@ public interface ISwWatchdog : IAsyncDisposable
     /// Current watchdog status.
     /// </summary>
     SwWatchdogStatus GetStatus();
+
+    /// <summary>
+    /// Current resource pressure across GDI, USER, and system memory.
+    /// Returns the worst (highest) pressure level among all resources.
+    /// Safe to call from any thread (Win32 only, no COM/STA dispatch).
+    /// Returns <see cref="ResourcePressure.Low"/> if SolidWorks is not running.
+    /// </summary>
+    ResourcePressure GetResourcePressure();
 }

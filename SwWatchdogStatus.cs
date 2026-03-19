@@ -12,4 +12,9 @@ public sealed record SwWatchdogStatus
     public required string? ActiveSessionId { get; init; }
     public required long MemoryMb { get; init; }
     public required bool Degraded { get; init; }
+    public required uint GdiObjects { get; init; }
+    public required uint UserObjects { get; init; }
+    public required uint GdiPeak { get; init; }
+    public required long FreeSystemMemoryMb { get; init; }
+    public required ResourcePressure ResourcePressure { get; init; }
 }
