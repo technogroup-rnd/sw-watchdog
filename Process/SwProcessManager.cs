@@ -24,7 +24,7 @@ internal sealed class SwProcessManager : IDisposable
     private nint _swHwnd;
     private DateTime _startTime;
     private int _filesProcessed;
-    private bool _tainted;
+    private bool _degraded;
     private bool _disposed;
 
     /// <summary>
@@ -60,13 +60,13 @@ internal sealed class SwProcessManager : IDisposable
         }
     }
 
-    public bool IsTainted
+    public bool IsDegraded
     {
         get
         {
             lock (_lock)
             {
-                return _tainted;
+                return _degraded;
             }
         }
     }
@@ -116,13 +116,13 @@ internal sealed class SwProcessManager : IDisposable
         }
     }
 
-    public void MarkTainted()
+    public void MarkDegraded()
     {
         lock (_lock)
         {
-            _tainted = true;
+            _degraded = true;
         }
-        _logger.LogWarning("SolidWorks process marked as tainted");
+        _logger.LogWarning("SolidWorks process marked as degraded");
     }
 
     public void IncrementFileCount(int count = 1)
@@ -151,7 +151,7 @@ internal sealed class SwProcessManager : IDisposable
     {
         lock (_lock)
         {
-            if (_tainted)
+            if (_degraded)
                 return true;
             if (
                 _options.RestartAfterFileCount > 0
@@ -175,8 +175,8 @@ internal sealed class SwProcessManager : IDisposable
     public void Restart(CancellationToken ct)
     {
         _logger.LogInformation(
-            "Restarting SolidWorks (tainted={Tainted}, files={Files}, uptime={Uptime}, memMb={Mem})",
-            _tainted,
+            "Restarting SolidWorks (degraded={Degraded}, files={Files}, uptime={Uptime}, memMb={Mem})",
+            _degraded,
             _filesProcessed,
             Uptime,
             MemoryMb
@@ -331,7 +331,7 @@ internal sealed class SwProcessManager : IDisposable
                 _swProcess = null;
             }
 
-            _tainted = false;
+            _degraded = false;
             _filesProcessed = 0;
         }
     }
@@ -388,7 +388,7 @@ internal sealed class SwProcessManager : IDisposable
             )!;
             _swProcess = process;
             _startTime = DateTime.UtcNow;
-            _tainted = false;
+            _degraded = false;
             _filesProcessed = 0;
 
             // Crash detection via event (instant, not polling)

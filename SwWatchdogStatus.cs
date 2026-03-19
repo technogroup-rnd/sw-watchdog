@@ -11,5 +11,5 @@ public sealed record SwWatchdogStatus
     public required int DocumentsOpen { get; init; }
     public required string? ActiveSessionId { get; init; }
     public required long MemoryMb { get; init; }
-    public required bool Tainted { get; init; }
+    public required bool Degraded { get; init; }
 }

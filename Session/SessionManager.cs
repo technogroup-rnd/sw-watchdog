@@ -100,7 +100,7 @@ internal sealed class SessionManager : IDisposable
 
             if (!clean)
             {
-                _processManager.MarkTainted();
+                _processManager.MarkDegraded();
                 // Restart and retry isolation
                 await _staThread.EnqueueAsync(
                     () => _processManager.Restart(CancellationToken.None),
@@ -121,7 +121,9 @@ internal sealed class SessionManager : IDisposable
                 );
 
                 if (!clean)
-                    throw new InvalidOperationException("SolidWorks is tainted even after restart");
+                    throw new InvalidOperationException(
+                        "SolidWorks is degraded even after restart"
+                    );
             }
 
             lock (_lock)
@@ -172,7 +174,7 @@ internal sealed class SessionManager : IDisposable
                 );
 
                 if (!clean)
-                    _processManager.MarkTainted();
+                    _processManager.MarkDegraded();
             }
 
             _logger.LogInformation("Session {SessionId} released", sessionId);
@@ -199,7 +201,7 @@ internal sealed class SessionManager : IDisposable
                 _options.SessionWatchdogTimeout
             );
 
-            _processManager.MarkTainted();
+            _processManager.MarkDegraded();
             await ReleaseAsync(sessionId);
         }
         catch (OperationCanceledException)

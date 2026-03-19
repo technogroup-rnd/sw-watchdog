@@ -19,7 +19,7 @@ internal sealed class IsolationProtocol
     }
 
     /// <summary>
-    /// Run the full isolation protocol. Returns true if clean, false if tainted.
+    /// Run the full isolation protocol. Returns true if clean, false if degraded.
     /// </summary>
     public bool Isolate(ISldWorks swApp, string workingDirectory)
     {
@@ -43,7 +43,7 @@ internal sealed class IsolationProtocol
             if (count != 0)
             {
                 _logger.LogError(
-                    "GetDocumentCount()={Count} after individual close — SW is tainted",
+                    "GetDocumentCount()={Count} after individual close — SW is degraded",
                     count
                 );
                 return false;
@@ -62,7 +62,7 @@ internal sealed class IsolationProtocol
 
     /// <summary>
     /// Run cleanup isolation (after session dispose). No directory setting needed.
-    /// Returns true if clean, false if tainted.
+    /// Returns true if clean, false if degraded.
     /// </summary>
     public bool Cleanup(ISldWorks swApp)
     {
@@ -80,7 +80,7 @@ internal sealed class IsolationProtocol
             count = swApp.GetDocumentCount();
             if (count != 0)
             {
-                _logger.LogError("Cleanup: GetDocumentCount()={Count} — SW is tainted", count);
+                _logger.LogError("Cleanup: GetDocumentCount()={Count} — SW is degraded", count);
                 return false;
             }
         }

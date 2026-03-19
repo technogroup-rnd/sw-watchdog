@@ -115,7 +115,7 @@ internal sealed class SwWatchdogImpl : ISwWatchdog
             DocumentsOpen = GetDocumentCount(),
             ActiveSessionId = _sessionManager.ActiveSessionId,
             MemoryMb = _processManager.MemoryMb,
-            Tainted = _processManager.IsTainted,
+            Degraded = _processManager.IsDegraded,
         };
     }
 
@@ -161,7 +161,7 @@ internal sealed class SwWatchdogImpl : ISwWatchdog
                         _processManager.SwPid
                     );
 
-                    _processManager.MarkTainted();
+                    _processManager.MarkDegraded();
 
                     if (_sessionManager.ActiveSessionId is null)
                     {
@@ -212,7 +212,7 @@ internal sealed class SwWatchdogImpl : ISwWatchdog
                         "Modal dialog could not be auto-dismissed (PID={Pid}) — killing",
                         _processManager.SwPid
                     );
-                    _processManager.MarkTainted();
+                    _processManager.MarkDegraded();
 
                     if (_sessionManager.ActiveSessionId is null)
                     {
