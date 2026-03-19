@@ -108,8 +108,9 @@ internal sealed class SwProcessManager : IDisposable
                     _swProcess.Refresh();
                     return _swProcess.WorkingSet64 / (1024 * 1024);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    _logger.LogWarning(ex, "Failed to read SolidWorks memory usage");
                     return 0;
                 }
             }
@@ -303,7 +304,10 @@ internal sealed class SwProcessManager : IDisposable
                 {
                     Marshal.ReleaseComObject(_swApp);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Failed to release SolidWorks COM object during cleanup");
+                }
                 _swApp = null;
             }
 

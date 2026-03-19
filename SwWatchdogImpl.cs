@@ -137,8 +137,9 @@ internal sealed class SwWatchdogImpl : ISwWatchdog
                 .GetAwaiter()
                 .GetResult();
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "Failed to query document count from SolidWorks");
             return -1;
         }
     }
