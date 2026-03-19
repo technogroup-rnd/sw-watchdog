@@ -191,6 +191,61 @@ internal sealed class SwProcessManager : IDisposable
     }
 
     /// <summary>
+    /// Check COM channel health using a lightweight sentinel call (RevisionNumber).
+    /// MUST be called from the STA thread.
+    /// </summary>
+    public SwHealthStatus CheckComHealth()
+    {
+        ISldWorks? swApp;
+
+        lock (_lock)
+        {
+            if (_swProcess is not { HasExited: false })
+            {
+                _logger.LogWarning("CheckComHealth: SW process is not running");
+                return SwHealthStatus.Dead;
+            }
+
+            swApp = _swApp;
+        }
+
+        if (swApp is null)
+        {
+            _logger.LogWarning(
+                "CheckComHealth: SW process alive but COM object is null — marking degraded"
+            );
+            MarkDegraded();
+            return SwHealthStatus.Degraded;
+        }
+
+        try
+        {
+            _ = swApp.RevisionNumber();
+            _logger.LogDebug("CheckComHealth: COM sentinel OK");
+            return SwHealthStatus.Healthy;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Re-check: if the process exited between our lock read and the sentinel call,
+            // this is Dead (process crashed), not Degraded (COM broken but process alive).
+            lock (_lock)
+            {
+                if (_swProcess is not { HasExited: false })
+                {
+                    _logger.LogWarning(
+                        "CheckComHealth: COM sentinel failed and process has exited — Dead"
+                    );
+                    return SwHealthStatus.Dead;
+                }
+            }
+
+            _logger.LogWarning(ex, "CheckComHealth: COM sentinel failed — marking degraded");
+            MarkDegraded();
+            return SwHealthStatus.Degraded;
+        }
+    }
+
+    /// <summary>
     /// Ensure SolidWorks is running. If not, launch and wait for full readiness.
     /// MUST be called from the STA thread.
     /// </summary>
@@ -227,7 +282,7 @@ internal sealed class SwProcessManager : IDisposable
     {
         _logger.LogInformation(
             "Restarting SolidWorks (degraded={Degraded}, uptime={Uptime}, memMb={Mem}, pressure={Pressure})",
-            _degraded,
+            IsDegraded,
             Uptime,
             MemoryMb,
             GetResourcePressure()

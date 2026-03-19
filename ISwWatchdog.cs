@@ -43,4 +43,19 @@ public interface ISwWatchdog : IAsyncDisposable
     /// Returns <see cref="ResourcePressure.Low"/> if SolidWorks is not running.
     /// </summary>
     ResourcePressure GetResourcePressure();
+
+    /// <summary>
+    /// Check COM channel health using a lightweight sentinel call (RevisionNumber).
+    /// <para>
+    /// <b>MUST be called from the STA thread</b> (inside <c>session.ExecuteAsync</c> lambda).
+    /// Does NOT dispatch to STA — caller is expected to already be on STA.
+    /// </para>
+    /// <para>Side effects:</para>
+    /// <list type="bullet">
+    ///   <item><see cref="SwHealthStatus.Degraded"/>: marks the process as degraded
+    ///         (next session boundary will trigger a restart).</item>
+    ///   <item><see cref="SwHealthStatus.Dead"/> / <see cref="SwHealthStatus.Healthy"/>: no side effects.</item>
+    /// </list>
+    /// </summary>
+    SwHealthStatus CheckComHealth();
 }

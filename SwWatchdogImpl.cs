@@ -107,6 +107,8 @@ internal sealed class SwWatchdogImpl : ISwWatchdog
 
     public ResourcePressure GetResourcePressure() => _processManager.GetResourcePressure();
 
+    public SwHealthStatus CheckComHealth() => _processManager.CheckComHealth();
+
     public SwWatchdogStatus GetStatus()
     {
         var snapshot = _processManager.SampleResources();
