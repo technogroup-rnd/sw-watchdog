@@ -45,6 +45,14 @@ public interface ISwWatchdog : IAsyncDisposable
     ResourcePressure GetResourcePressure();
 
     /// <summary>
+    /// Signal that SW must be restarted at the next session boundary.
+    /// Marks the process as needing restart — next <see cref="AcquireSessionAsync"/>
+    /// will kill and relaunch SolidWorks.
+    /// Safe to call from any thread. Does NOT kill SW immediately.
+    /// </summary>
+    void RequestRestart(string reason);
+
+    /// <summary>
     /// Check COM channel health using a lightweight sentinel call (RevisionNumber).
     /// <para>
     /// <b>MUST be called from the STA thread</b> (inside <c>session.ExecuteAsync</c> lambda).

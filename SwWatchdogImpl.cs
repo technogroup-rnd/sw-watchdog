@@ -105,6 +105,12 @@ internal sealed class SwWatchdogImpl : ISwWatchdog
             .ContinueWith(t => (ISwSession)t.Result, TaskContinuationOptions.OnlyOnRanToCompletion);
     }
 
+    public void RequestRestart(string reason)
+    {
+        _logger.LogInformation("Restart requested by caller: {Reason}", reason);
+        _processManager.MarkDegraded();
+    }
+
     public ResourcePressure GetResourcePressure() => _processManager.GetResourcePressure();
 
     public SwHealthStatus CheckComHealth() => _processManager.CheckComHealth();
