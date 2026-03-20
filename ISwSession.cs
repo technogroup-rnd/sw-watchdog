@@ -21,13 +21,16 @@ public interface ISwSession : IAsyncDisposable
     /// <summary>
     /// Execute an operation within this session on the STA thread.
     /// </summary>
+    /// <exception cref="SwProcessKilledException">
+    /// SolidWorks was killed by the watchdog (hang/modal) during this operation.
+    /// Transient — acquire a new session and retry.
+    /// The gRPC layer maps this to <c>StatusCode.Unavailable</c>.
+    /// </exception>
     Task<TResult> ExecuteAsync<TResult>(
         Func<ISldWorks, TResult> operation,
         CancellationToken ct = default
     );
 
-    /// <summary>
-    /// Fire-and-forget variant (no result).
-    /// </summary>
+    /// <inheritdoc cref="ExecuteAsync{TResult}"/>
     Task ExecuteAsync(Action<ISldWorks> operation, CancellationToken ct = default);
 }

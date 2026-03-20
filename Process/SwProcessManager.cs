@@ -440,7 +440,10 @@ internal sealed class SwProcessManager : IDisposable
                 _swProcess = null;
             }
 
-            _degraded = false;
+            // Note: _degraded is NOT reset here. Kill() destroys the process;
+            // Launch() creates a clean one and resets _degraded there.
+            // This ensures SwSession.IsProcessKilledException can observe
+            // isDegraded=true after a hang-kill, before the next Launch().
         }
     }
 

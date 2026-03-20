@@ -249,7 +249,7 @@ internal sealed class SwSession : ISwSession
             )
         {
             throw new SwProcessKilledException(
-                "SolidWorks was killed by hang detection during active session",
+                "SolidWorks was killed during active session — transient, retry with a new session",
                 ex
             );
         }
@@ -281,7 +281,7 @@ internal sealed class SwSession : ISwSession
             )
         {
             throw new SwProcessKilledException(
-                "SolidWorks was killed by hang detection during active session",
+                "SolidWorks was killed during active session — transient, retry with a new session",
                 ex
             );
         }
