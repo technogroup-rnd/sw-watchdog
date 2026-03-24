@@ -8,25 +8,25 @@ public sealed class SwWatchdogOptions
     /// <summary>
     /// Path to sldworks.exe. If null, resolved from registry.
     /// </summary>
-    public string? SolidWorksPath { get; set; }
+    public string? SolidWorksPath { get; init; }
 
     /// <summary>
     /// Max time to wait for SW to start (Process.Start → ROT registration → StartupProcessCompleted).
     /// </summary>
-    public TimeSpan StartupTimeout { get; set; } = TimeSpan.FromSeconds(120);
+    public TimeSpan StartupTimeout { get; init; } = TimeSpan.FromSeconds(120);
 
     /// <summary>
     /// How often the hang detection loop runs (sends WM_NULL to SW window
     /// and checks for modal dialogs). Lower = faster detection, higher CPU.
     /// Also used as the base for exponential backoff during hang confirmation.
     /// </summary>
-    public TimeSpan HangCheckInterval { get; set; } = TimeSpan.FromSeconds(5);
+    public TimeSpan HangCheckInterval { get; init; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
     /// How long SendMessageTimeoutW waits for SW to respond to WM_NULL
     /// before declaring the window unresponsive for that single check.
     /// </summary>
-    public TimeSpan HangCheckTimeout { get; set; } = TimeSpan.FromSeconds(5);
+    public TimeSpan HangCheckTimeout { get; init; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
     /// Number of consecutive unresponsive checks before confirming hang and killing SW.
@@ -34,35 +34,35 @@ public sealed class SwWatchdogOptions
     /// Prevents false positives during long operations (large assembly load).
     /// With default 3 retries and 5s interval: ~35 seconds total before kill.
     /// </summary>
-    public int HangConfirmRetries { get; set; } = 3;
+    public int HangConfirmRetries { get; init; } = 3;
 
     /// <summary>
     /// Restart SW when free system memory drops below this threshold in MB (0 = disabled).
     /// Pressure formula: FreeMemoryLimitMb / actualFreeMemoryMb.
     /// </summary>
-    public long FreeMemoryLimitMb { get; set; } = 512;
+    public long FreeMemoryLimitMb { get; init; } = 512;
 
     /// <summary>
     /// GDI object threshold as percentage of the system GDI limit (0 = disabled).
     /// Default 80% is below SW's own 85% warning — leaves buffer for finalization.
     /// </summary>
-    public int GdiObjectsLimitPercent { get; set; } = 80;
+    public int GdiObjectsLimitPercent { get; init; } = 80;
 
     /// <summary>
     /// USER object threshold as percentage of the system USER limit (0 = disabled).
     /// </summary>
-    public int UserObjectsLimitPercent { get; set; } = 80;
+    public int UserObjectsLimitPercent { get; init; } = 80;
 
     /// <summary>
     /// Kill SW process after no sessions for this duration (Zero = disabled).
     /// Frees system resources when the service is idle. SW restarts on next request.
     /// </summary>
-    public TimeSpan IdleShutdownAfter { get; set; } = TimeSpan.FromMinutes(30);
+    public TimeSpan IdleShutdownAfter { get; init; } = TimeSpan.FromMinutes(30);
 
     /// <summary>
     /// Polling interval for ROT (Running Object Table) during SW startup.
     /// After Process.Start, SW takes time to register its COM object in ROT.
     /// Lower = faster startup detection, higher CPU during launch.
     /// </summary>
-    public TimeSpan RotPollingInterval { get; set; } = TimeSpan.FromMilliseconds(500);
+    public TimeSpan RotPollingInterval { get; init; } = TimeSpan.FromMilliseconds(500);
 }
