@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="SwWorker.Service.Tests" />
+    <InternalsVisibleTo Include="SwWorker.Integration" />
     <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
   </ItemGroup>
 
