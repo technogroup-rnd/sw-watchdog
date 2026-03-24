@@ -78,6 +78,12 @@ internal static partial class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX lpBuffer);
 
+    // --- Global Atom Table (per-WindowStation, session-level resource) ---
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode, EntryPoint = "GlobalGetAtomNameW")]
+    public static extern uint GlobalGetAtomName(ushort nAtom, StringBuilder lpBuffer, int nSize);
+
+    // --- COM ROT / BindCtx ---
     // COM interface types not supported by LibraryImport source generator — use DllImport
     [DllImport("ole32.dll")]
     public static extern int GetRunningObjectTable(uint reserved, out IRunningObjectTable pprot);

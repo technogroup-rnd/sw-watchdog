@@ -14,7 +14,7 @@ public enum ResourcePressure
     Critical = 4, // ratio >= 1.00
 }
 
-internal static class ResourcePressureCalculator
+public static class ResourcePressureCalculator
 {
     /// <summary>
     /// Convert a pressure ratio (0.0–1.0+) to a <see cref="ResourcePressure"/> level.
