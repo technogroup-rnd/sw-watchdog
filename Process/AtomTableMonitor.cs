@@ -63,9 +63,11 @@ public sealed class AtomTableMonitor
         var used = 0;
         var buffer = new StringBuilder(256);
 
-        for (var atom = AtomTableSnapshot.AtomRangeStart;
-             atom <= AtomTableSnapshot.AtomRangeEnd;
-             atom++)
+        for (
+            var atom = AtomTableSnapshot.AtomRangeStart;
+            atom <= AtomTableSnapshot.AtomRangeEnd;
+            atom++
+        )
         {
             buffer.Clear();
             if (NativeMethods.GlobalGetAtomName((ushort)atom, buffer, buffer.Capacity) > 0)

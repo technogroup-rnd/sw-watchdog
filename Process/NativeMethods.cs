@@ -80,7 +80,12 @@ internal static partial class NativeMethods
 
     // --- Global Atom Table (per-WindowStation, session-level resource) ---
 
-    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode, EntryPoint = "GlobalGetAtomNameW")]
+    [DllImport(
+        "kernel32.dll",
+        SetLastError = true,
+        CharSet = CharSet.Unicode,
+        EntryPoint = "GlobalGetAtomNameW"
+    )]
     public static extern uint GlobalGetAtomName(ushort nAtom, StringBuilder lpBuffer, int nSize);
 
     // --- COM ROT / BindCtx ---
