@@ -38,6 +38,12 @@ public sealed class AtomTableMonitor
     /// pressure relative to the configured threshold.
     /// ~25-40 ms on typical hardware. Safe to call from any thread (Win32 only, no COM/STA).
     /// </summary>
+    /// <summary>
+    /// Last snapshot taken by <see cref="Sample"/>. Null until first call.
+    /// Read by GetStatus to report session health without triggering a new enumeration.
+    /// </summary>
+    public AtomTableSnapshot? LastSnapshot { get; private set; }
+
     public AtomTableSnapshot Sample()
     {
         var used = CountUsedAtoms();
@@ -51,6 +57,7 @@ public sealed class AtomTableMonitor
             snapshot.Pressure
         );
 
+        LastSnapshot = snapshot;
         return snapshot;
     }
 
