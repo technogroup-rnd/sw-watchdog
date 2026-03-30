@@ -455,6 +455,9 @@ internal sealed class SwProcessManager : IDisposable
     {
         var exePath = ResolveSolidWorksPath();
 
+        // Ensure Bridge add-in is marked for auto-load before SW starts.
+        EnsureAddInStartupRegistered();
+
         // Kill any orphan SLDWORKS processes before starting a new one.
         // Scenario: service restarted (_swProcess=null) but old SW still alive, or Kill() threw.
         var orphans = System.Diagnostics.Process.GetProcessesByName("SLDWORKS");
@@ -579,6 +582,9 @@ internal sealed class SwProcessManager : IDisposable
         {
             _logger.LogWarning(ex, "Failed to set dialog suppression preferences");
         }
+
+        // Ensure Bridge add-in is loaded (idempotent — returns swAddinAlreadyLoaded if loaded).
+        EnsureAddInLoaded(swApp);
 
         lock (_lock)
         {
@@ -784,6 +790,83 @@ internal sealed class SwProcessManager : IDisposable
         throw new FileNotFoundException(
             "SolidWorks installation not found. Set SwWatchdogOptions.SolidWorksPath explicitly."
         );
+    }
+
+    /// <summary>
+    /// Pre-launch: ensure the Bridge add-in is marked for auto-load in the per-user registry.
+    /// SW reads HKCU\Software\SolidWorks\AddInsStartup\{GUID} at startup.
+    /// If the key is missing or set to 0, SW will not load the add-in automatically.
+    /// </summary>
+    private void EnsureAddInStartupRegistered()
+    {
+        if (string.IsNullOrEmpty(_options.AddInClsid))
+            return;
+
+        var keyPath = $@"Software\SolidWorks\AddInsStartup\{_options.AddInClsid}";
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(keyPath);
+            var current = key.GetValue(null) as int?;
+            if (current == 1)
+            {
+                _logger.LogDebug("Bridge add-in startup already enabled: {Key}", keyPath);
+                return;
+            }
+
+            key.SetValue(null, 1, Microsoft.Win32.RegistryValueKind.DWord);
+            _logger.LogInformation("Bridge add-in startup enabled: {Key} set to 1", keyPath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to verify/set add-in startup registry key: {Key}",
+                keyPath
+            );
+        }
+    }
+
+    /// <summary>
+    /// Post-launch: ensure the Bridge add-in is loaded in the running SW instance.
+    /// <c>LoadAddIn</c> is idempotent: returns <c>swAddinAlreadyLoaded</c> (2) if already loaded.
+    /// Called after Stage 3 (StartupProcessCompleted), before sessions are available.
+    /// </summary>
+    private void EnsureAddInLoaded(ISldWorks swApp)
+    {
+        if (string.IsNullOrEmpty(_options.AddInDllPath))
+            return;
+
+        try
+        {
+            var result = (swLoadAddinError_e)swApp.LoadAddIn(_options.AddInDllPath);
+            switch (result)
+            {
+                case swLoadAddinError_e.swSuccess:
+                    _logger.LogInformation(
+                        "Bridge add-in loaded successfully via LoadAddIn({Path})",
+                        _options.AddInDllPath
+                    );
+                    break;
+                case swLoadAddinError_e.swAddinAlreadyLoaded:
+                    _logger.LogDebug("Bridge add-in already loaded (swAddinAlreadyLoaded)");
+                    break;
+                default:
+                    _logger.LogWarning(
+                        "LoadAddIn returned {Result} for {Path} — add-in may not be available",
+                        result,
+                        _options.AddInDllPath
+                    );
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to call LoadAddIn({Path}) — add-in may not be available",
+                _options.AddInDllPath
+            );
+        }
     }
 
     public void Dispose()

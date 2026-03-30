@@ -65,4 +65,19 @@ public sealed class SwWatchdogOptions
     /// Lower = faster startup detection, higher CPU during launch.
     /// </summary>
     public TimeSpan RotPollingInterval { get; init; } = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>
+    /// COM CLSID of the Bridge add-in, in braces: <c>{xxxxxxxx-xxxx-...}</c>.
+    /// Used for registry startup check (HKCU\Software\SolidWorks\AddInsStartup\{GUID}).
+    /// If null, add-in management is disabled — Watchdog does not verify add-in loading.
+    /// </summary>
+    public string? AddInClsid { get; init; }
+
+    /// <summary>
+    /// Full path to the Bridge add-in DLL.
+    /// Used for <c>ISldWorks.LoadAddIn(path)</c> after SW startup to guarantee the add-in
+    /// is loaded even if the startup registry key was missing or SW skipped it.
+    /// Required when <see cref="AddInClsid"/> is set.
+    /// </summary>
+    public string? AddInDllPath { get; init; }
 }

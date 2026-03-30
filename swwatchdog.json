@@ -7,5 +7,6 @@
   "GdiObjectsLimitPercent": 80,
   "UserObjectsLimitPercent": 80,
   "IdleShutdownAfter": "00:30:00",
-  "RotPollingInterval": "00:00:00.500"
+  "RotPollingInterval": "00:00:00.500",
+  "AddInClsid": "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
 }
