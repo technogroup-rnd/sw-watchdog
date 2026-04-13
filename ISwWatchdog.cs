@@ -45,10 +45,10 @@ public interface ISwWatchdog : IAsyncDisposable
     ResourcePressure GetResourcePressure();
 
     /// <summary>
-    /// Signal that SW must be restarted at the next session boundary.
-    /// Marks the process as needing restart — next <see cref="AcquireSessionAsync"/>
-    /// will kill and relaunch SolidWorks.
-    /// Safe to call from any thread. Does NOT kill SW immediately.
+    /// Kill SolidWorks and mark for restart.
+    /// Caller must ensure SW is safe to kill (e.g., STA thread is idle after Ping gate).
+    /// Next <see cref="AcquireSessionAsync"/> (or <c>WaitForReadyAsync</c>) will launch a new instance.
+    /// Safe to call from any thread. Idempotent if SW is already dead.
     /// </summary>
     void RequestRestart(string reason);
 }

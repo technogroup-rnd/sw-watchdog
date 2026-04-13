@@ -107,8 +107,9 @@ internal sealed class SwWatchdogImpl : ISwWatchdog
 
     public void RequestRestart(string reason)
     {
-        _logger.LogInformation("Restart requested by caller: {Reason}", reason);
+        _logger.LogWarning("Restart requested by caller: {Reason}", reason);
         _processManager.MarkDegraded();
+        _processManager.Kill();
     }
 
     public ResourcePressure GetResourcePressure() => _processManager.GetResourcePressure();
