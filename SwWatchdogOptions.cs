@@ -37,10 +37,12 @@ public sealed class SwWatchdogOptions
     public int HangConfirmRetries { get; init; } = 3;
 
     /// <summary>
-    /// Restart SW when free system memory drops below this threshold in MB (0 = disabled).
+    /// Free system memory floor in MB (0 = disabled).
     /// Pressure formula: FreeMemoryLimitMb / actualFreeMemoryMb.
+    /// Single source of truth — also used by Bridge for graceful degradation threshold
+    /// (passed via gRPC request as MinAvailableRamMb).
     /// </summary>
-    public long FreeMemoryLimitMb { get; init; } = 512;
+    public long FreeMemoryLimitMb { get; init; } = 2048;
 
     /// <summary>
     /// GDI object threshold as percentage of the system GDI limit (0 = disabled).

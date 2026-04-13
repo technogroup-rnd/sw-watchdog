@@ -3,7 +3,7 @@
   "HangCheckInterval": "00:00:05",
   "HangCheckTimeout": "00:00:05",
   "HangConfirmRetries": 3,
-  "FreeMemoryLimitMb": 512,
+  "FreeMemoryLimitMb": 2048,
   "GdiObjectsLimitPercent": 80,
   "UserObjectsLimitPercent": 80,
   "IdleShutdownAfter": "00:30:00",
