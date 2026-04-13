@@ -144,7 +144,7 @@ internal sealed class ResourceMonitor
 /// <summary>
 /// Point-in-time snapshot of GDI, USER, and system memory resources.
 /// </summary>
-internal sealed record ResourceSnapshot
+public sealed record ResourceSnapshot
 {
     public required uint GdiObjects { get; init; }
     public required uint UserObjects { get; init; }

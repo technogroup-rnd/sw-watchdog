@@ -1,4 +1,5 @@
 using SolidWorks.Interop.sldworks;
+using SwWatchdog.Process;
 
 namespace SwWatchdog;
 
@@ -43,6 +44,14 @@ public interface ISwWatchdog : IAsyncDisposable
     /// Returns <see cref="ResourcePressure.Low"/> if SolidWorks is not running.
     /// </summary>
     ResourcePressure GetResourcePressure();
+
+    /// <summary>
+    /// Full resource snapshot with individual GDI/USER/memory metrics.
+    /// Same P/Invoke cost as <see cref="GetResourcePressure"/> (which internally
+    /// creates a full snapshot and discards the breakdown).
+    /// Returns <c>null</c> if SolidWorks is not running or on sampling error.
+    /// </summary>
+    ResourceSnapshot? SampleResources();
 
     /// <summary>
     /// Kill SolidWorks and mark for restart.
