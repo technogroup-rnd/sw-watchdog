@@ -11,6 +11,11 @@ public interface ISwWatchdog : IAsyncDisposable
     /// <summary>
     /// Execute an operation on the STA thread with access to ISldWorks.
     /// Watchdog guarantees: SW is running, STA thread, serialized access.
+    /// <para>
+    /// <b>Thread-affinity:</b> blocking-on-STA. Caller waits until STA picks up and runs the
+    /// lambda; cancellation via <paramref name="ct"/> aborts the wait but does not abort
+    /// a lambda already in progress.
+    /// </para>
     /// </summary>
     Task<TResult> ExecuteAsync<TResult>(
         Func<ISldWorks, TResult> operation,
@@ -18,13 +23,18 @@ public interface ISwWatchdog : IAsyncDisposable
     );
 
     /// <summary>
-    /// Fire-and-forget variant (no result).
+    /// Fire-and-forget variant (no result). Same thread-affinity as
+    /// <see cref="ExecuteAsync{TResult}"/>.
     /// </summary>
     Task ExecuteAsync(Action<ISldWorks> operation, CancellationToken ct = default);
 
     /// <summary>
     /// Acquire a session: isolation protocol + SetSearchFolders(workingDir).
     /// Only one session at a time (exclusive access).
+    /// <para>
+    /// <b>Thread-affinity:</b> blocking-on-STA, may also wait for a busy session to release
+    /// up to <paramref name="timeout"/>. Cancellation via <paramref name="ct"/> aborts the wait.
+    /// </para>
     /// </summary>
     Task<ISwSession> AcquireSessionAsync(
         string workingDirectory,
@@ -33,7 +43,16 @@ public interface ISwWatchdog : IAsyncDisposable
     );
 
     /// <summary>
-    /// Current watchdog status.
+    /// Current watchdog status — SW process identity, uptime, resource snapshot, and
+    /// active session id.
+    /// <para>
+    /// <b>Thread-affinity:</b> safe — Win32-only (process metrics, resource sampling)
+    /// and in-process state. Never dispatches to STA, so polling during heavy COM
+    /// work returns immediately. SW-aliveness signals surface via <c>SwRunning</c>
+    /// (process exit detected by <c>SwProcessManager</c>) and <c>Degraded</c>
+    /// (set by hang-detection loop after <c>WM_NULL</c>+CPU-idle confirmation +
+    /// kill); no extra COM probe is required for liveness.
+    /// </para>
     /// </summary>
     SwWatchdogStatus GetStatus();
 

@@ -125,7 +125,6 @@ internal sealed class SwWatchdogImpl : ISwWatchdog
             SwRunning = _processManager.IsRunning,
             SwPid = _processManager.SwPid,
             SwUptime = _processManager.Uptime,
-            DocumentsOpen = GetDocumentCount(),
             ActiveSessionId = _sessionManager.ActiveSessionId,
             MemoryMb = _processManager.MemoryMb,
             Degraded = _processManager.IsDegraded,
@@ -135,31 +134,6 @@ internal sealed class SwWatchdogImpl : ISwWatchdog
             FreeSystemMemoryMb = snapshot?.FreeSystemMemoryMb ?? 0,
             ResourcePressure = snapshot?.Overall ?? ResourcePressure.Low,
         };
-    }
-
-    private int GetDocumentCount()
-    {
-        if (!_processManager.IsRunning)
-            return 0;
-        try
-        {
-            return _staThread
-                .EnqueueAsync(
-                    () =>
-                    {
-                        var swApp = _processManager.SwApp;
-                        return swApp?.GetDocumentCount() ?? 0;
-                    },
-                    CancellationToken.None
-                )
-                .GetAwaiter()
-                .GetResult();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to query document count from SolidWorks");
-            return -1;
-        }
     }
 
     private async Task RunHangDetectionLoopAsync(CancellationToken ct)
