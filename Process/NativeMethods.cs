@@ -34,7 +34,10 @@ internal static partial class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool IsWindowVisible(nint hWnd);
 
-    [LibraryImport("user32.dll")]
+    // EntryPoint must be explicit: user32.dll exports 'PostMessageA'/'PostMessageW',
+    // not bare 'PostMessage' (that's a C preprocessor macro). LibraryImport —
+    // unlike DllImport with CharSet.Auto — does not apply A/W suffixing.
+    [LibraryImport("user32.dll", EntryPoint = "PostMessageW")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool PostMessage(nint hWnd, uint msg, nint wParam, nint lParam);
 
@@ -48,6 +51,12 @@ internal static partial class NativeMethods
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern int GetClassNameW(nint hWnd, StringBuilder lpClassName, int nMaxCount);
+
+    // DllImport (not LibraryImport) — the StringBuilder/char[] buffer marshalling
+    // isn't supported by the LibraryImport source generator without
+    // DisableRuntimeMarshalling. Same pattern as GetClassNameW above.
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "GetWindowTextW")]
+    private static extern int GetWindowTextW(nint hWnd, StringBuilder lpString, int nMaxCount);
 
     // --- GetGuiResources (GDI/USER object monitoring) ---
 
@@ -103,6 +112,17 @@ internal static partial class NativeMethods
     {
         var sb = new StringBuilder(256);
         GetClassNameW(hwnd, sb, sb.Capacity);
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Get the window title (caption). Returns empty string if the window has no title
+    /// or retrieval fails. Capped at 256 chars — sufficient for SW dialog titles.
+    /// </summary>
+    public static string GetWindowText(nint hwnd)
+    {
+        var sb = new StringBuilder(256);
+        GetWindowTextW(hwnd, sb, sb.Capacity);
         return sb.ToString();
     }
 }

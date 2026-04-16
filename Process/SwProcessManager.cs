@@ -330,9 +330,11 @@ internal sealed class SwProcessManager : IDisposable
 
         foreach (var dlg in dialogHandles)
         {
+            var title = NativeMethods.GetWindowText(dlg);
             _logger.LogWarning(
-                "D7 Layer 6: Sending WM_CLOSE to dialog 0x{Handle:X} (PID={Pid})",
+                "D7 Layer 6: Sending WM_CLOSE to dialog 0x{Handle:X} title=\"{Title}\" (PID={Pid})",
                 dlg,
+                title,
                 pid
             );
             NativeMethods.PostMessage(dlg, NativeMethods.WM_CLOSE, nint.Zero, nint.Zero);
